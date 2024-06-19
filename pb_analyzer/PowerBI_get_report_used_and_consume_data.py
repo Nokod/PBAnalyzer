@@ -4,7 +4,7 @@ import json
 import msal
 import requests
 
-from uriya_scripts.utils import filter_strings_not_in_json, write_to_csv, count_hidden_true_in_dict
+from pb_analyzer.utils import filter_strings_not_in_json, write_to_csv, count_hidden_true_in_dict
 
 
 def extract_artifact_ids(response: dict):
