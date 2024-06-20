@@ -1,5 +1,6 @@
 import argparse
 import json
+from urllib.parse import urlparse
 
 import msal
 import requests
@@ -58,16 +59,17 @@ def links_shared_to_whole_organization_api(token: str):
         return None
 
 
-def send_push_access_request(token: str, report_id: str):
+def send_push_access_request(token: str, report_id: str, region: str):
     """
     Sends a POST request to the Power BI API to push access to a report.
 
     Args:
         token (str): The access token to use for authentication.
         report_id (str): The ID of the report to push access to.
+        region (str): The region to use for the request.
 
     """
-    url = f'https://wabi-west-europe-f-primary-redirect.analysis.windows.net/metadata/access/reports/{report_id}/pushaccess?forceRefreshGroups=true'
+    url = f'https://{region}/metadata/access/reports/{report_id}/pushaccess?forceRefreshGroups=true'
 
     headers = {'authorization': f'Bearer {token}'}
     response = requests.post(url, headers=headers)
@@ -82,16 +84,16 @@ def send_push_access_request(token: str, report_id: str):
         return None
 
 
-def send_exploration_request(token: str, artifact_id: str):
+def send_exploration_request(token: str, artifact_id: str, region: str):
     """
     Sends an exploration request to the Power BI API and returns the response.
 
     Args:
         token (str): The access token to use for authentication.
         artifact_id (str): The ID of the artifact to explore.
-
+        region (str): The region to use for the request.
     """
-    url = f'https://wabi-west-europe-f-primary-redirect.analysis.windows.net/explore/reports/{artifact_id}/exploration'
+    url = f'https://{region}/explore/reports/{artifact_id}/exploration'
     headers = {'authorization': f'Bearer {token}'}
     response = requests.get(url, headers=headers)
 
@@ -103,17 +105,16 @@ def send_exploration_request(token: str, artifact_id: str):
         print('Response:', response.text)
 
 
-def send_conceptual_schema_request(token, model_id):
+def send_conceptual_schema_request(token: str, model_id: str, region: str):
     """
     Sends a POST request to the Power BI API to retrieve the conceptual schema of a model.
 
     Args:
         token (str): The access token to use for authentication.
         model_id (str): The ID of the model to retrieve the conceptual schema for.
-
+        region (str): The region to use for the request.
     """
-    url = 'https://wabi-west-europe-f-primary-redirect.analysis.windows.net/explore/conceptualschema'
-
+    url = f'https://{region}/explore/conceptualschema'
     headers = {
         'authorization': f'Bearer {token}',
         'content-type': 'application/json; charset=UTF-8',
@@ -166,24 +167,35 @@ def fetch_columns_and_tables(conceptual_schema: dict):
                                 "DateTableTemplate" not in item and "LocalDateTable" not in item]
     return filtered_cols_and_tables
 
+def extract_region(response: dict):
+    """
+    Extracts the region from the given API response.
+
+    Args:
+        response (dict): The API response in dictionary format.
+    """
+    url = urlparse(response.get('@odata.context'))
+    return url.netloc
+
 
 def main(output_path: str):
     token = get_token()
     all_shared_res = links_shared_to_whole_organization_api(token)
 
     report_list = extract_artifact_ids(all_shared_res)
+    region = extract_region(all_shared_res)
 
     write_to_csv(output_path, 'Report ID', 'Number of hidden columns', ['All columns'], ['Unused columns'], True)
     for reportID in report_list:
-        response_data = send_push_access_request(token, reportID)
+        response_data = send_push_access_request(token, reportID, region)
         if response_data:
             artifact_id = response_data['entityKey']['id']
             model_id = next(item['id'] for item in response_data['relatedEntityKeys'] if item['type'] == 4)
             print(f'Extracted artifact_id: {artifact_id}, model_id: {model_id}')
-            conceptual_schema = send_conceptual_schema_request(token, model_id)
+            conceptual_schema = send_conceptual_schema_request(token, model_id, region)
             num_of_hidden = count_hidden_true_in_dict(conceptual_schema)
             print("There are " + str(num_of_hidden) + " Hidden column in this report")
-            exploration_query = send_exploration_request(token, artifact_id)
+            exploration_query = send_exploration_request(token, artifact_id, region)
             columns_and_tables = fetch_columns_and_tables(conceptual_schema)
             unused_column = filter_strings_not_in_json(columns_and_tables, exploration_query)
             write_to_csv(output_path, reportID, str(num_of_hidden), columns_and_tables, unused_column)
