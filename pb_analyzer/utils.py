@@ -16,26 +16,21 @@ def filter_strings_not_in_json(strings_list: list, json_string: str):
     return [string for string in strings_list if string not in normalized_json_string]
 
 
-def write_to_csv(file_path, value1, value2, value3, value4, overwrite=False):
+def write_to_csv(file_path, values, overwrite=False):
     """
     Writes values to a CSV file.
 
     Args:
         file_path (str): The path to the CSV file.
-        value1 (str): The first value to write.
-        value2 (str): The second value to write.
-        value3 (list): The third value to write.
-        value4 (list): The fourth value to write.
+        values (list): The values to write to the CSV file.
         overwrite (bool): Whether to overwrite the file or append to it. Default is False.
 
     """
-    value4_str = ", ".join(value4)
-    value3_str = ", ".join(value3)
     mode = 'w' if overwrite else 'a'
     with open(file_path, mode=mode, newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
         # write header while deleting past data
-        writer.writerow([value1, value2, value3_str, value4_str])
+        writer.writerow(values)
 
 
 def count_hidden_true_in_dict(response):

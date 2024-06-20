@@ -37,6 +37,28 @@ def get_token():
         raise Exception("Failed to acquire token: %s" % result.get("error_description"))
 
 
+def reports_published_to_web_api(token: str):
+    """
+    Sends a GET request to the Power BI API to retrieve the list of reports published to the web.
+
+    Args:
+        token (str): The access token to use for authentication.
+
+    """
+    url = 'https://api.powerbi.com/v1.0/myorg/admin/widelySharedArtifacts/publishedToWeb'
+    headers = {'authorization': f'Bearer {token}'}
+    response = requests.get(url, headers=headers)
+
+    if response.status_code == 200:
+        print('Request was successful.')
+        response_data = response.json()
+        return response_data
+    else:
+        print(f'Failed to send request. Status code: {response.status_code}')
+        print('Response:', response.text)
+        return None
+
+
 def links_shared_to_whole_organization_api(token: str):
     """
     Sends a GET request to the Power BI API to retrieve the list of widely shared artifacts.
@@ -167,6 +189,7 @@ def fetch_columns_and_tables(conceptual_schema: dict):
                                 "DateTableTemplate" not in item and "LocalDateTable" not in item]
     return filtered_cols_and_tables
 
+
 def extract_region(response: dict):
     """
     Extracts the region from the given API response.
@@ -181,11 +204,15 @@ def extract_region(response: dict):
 def main(output_path: str):
     token = get_token()
     all_shared_res = links_shared_to_whole_organization_api(token)
-
     report_list = extract_artifact_ids(all_shared_res)
+
+    published_to_web_res = reports_published_to_web_api(token)
+    published_to_web_ids = extract_artifact_ids(published_to_web_res)
+
     region = extract_region(all_shared_res)
 
-    write_to_csv(output_path, 'Report ID', 'Number of hidden columns', ['All columns'], ['Unused columns'], True)
+    write_to_csv(output_path, ['Report ID', 'Number of hidden columns', 'All columns', 'Unused columns',
+                               'Published to web'], True)
     for reportID in report_list:
         response_data = send_push_access_request(token, reportID, region)
         if response_data:
@@ -198,7 +225,9 @@ def main(output_path: str):
             exploration_query = send_exploration_request(token, artifact_id, region)
             columns_and_tables = fetch_columns_and_tables(conceptual_schema)
             unused_column = filter_strings_not_in_json(columns_and_tables, exploration_query)
-            write_to_csv(output_path, reportID, str(num_of_hidden), columns_and_tables, unused_column)
+            write_to_csv(output_path,
+                         [reportID, str(num_of_hidden), ', '.join(columns_and_tables), ', '.join(unused_column),
+                          reportID in published_to_web_ids])
 
 
 if __name__ == "__main__":
