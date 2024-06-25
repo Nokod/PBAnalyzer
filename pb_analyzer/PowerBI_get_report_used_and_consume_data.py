@@ -274,20 +274,24 @@ def main(output_path: str):
     write_to_csv(output_path, ['Report ID', 'Number of hidden columns', 'All columns', 'Unused columns',
                                'Published to web'], True)
     for reportID in report_list:
-        response_data = send_push_access_request(token, reportID, region)
-        if response_data:
-            artifact_id = response_data['entityKey']['id']
-            model_id = next(item['id'] for item in response_data['relatedEntityKeys'] if item['type'] == 4)
-            print(f'Extracted artifact_id: {artifact_id}, model_id: {model_id}')
-            conceptual_schema = send_conceptual_schema_request(token, model_id, region)
-            num_of_hidden = count_hidden_true_in_dict(conceptual_schema)
-            print("There are " + str(num_of_hidden) + " Hidden column in this report")
-            exploration_query = send_exploration_request(token, artifact_id, region)
-            columns_and_tables = fetch_columns_and_tables(conceptual_schema)
-            unused_column = filter_strings_not_in_json(columns_and_tables, exploration_query)
-            write_to_csv(output_path,
-                         [reportID, str(num_of_hidden), ', '.join(columns_and_tables), ', '.join(unused_column),
-                          reportID in published_to_web_ids])
+        try:
+            print(f'Processing report ID: {reportID}')
+            response_data = send_push_access_request(token, reportID, region)
+            if response_data:
+                artifact_id = response_data['entityKey']['id']
+                model_id = next(item['id'] for item in response_data['relatedEntityKeys'] if item['type'] == 4)
+                print(f'Extracted artifact_id: {artifact_id}, model_id: {model_id}')
+                conceptual_schema = send_conceptual_schema_request(token, model_id, region)
+                num_of_hidden = count_hidden_true_in_dict(conceptual_schema)
+                print("There are " + str(num_of_hidden) + " Hidden column in this report")
+                exploration_query = send_exploration_request(token, artifact_id, region)
+                columns_and_tables = fetch_columns_and_tables(conceptual_schema)
+                unused_column = filter_strings_not_in_json(columns_and_tables, exploration_query)
+                write_to_csv(output_path,
+                             [reportID, str(num_of_hidden), ', '.join(columns_and_tables), ', '.join(unused_column),
+                              reportID in published_to_web_ids])
+        except Exception as e:
+            print(f"An error occurred while processing report ID {reportID}: {e}")
 
 
 if __name__ == "__main__":
