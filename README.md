@@ -17,7 +17,7 @@ The script requires the name of the output CSV file as a command-line argument
 Example usage:
 
 ```bash
-python PowerBI_get_report_used_and_consume_data.py --output-csv-filename output.csv
+python power_bi_get_report_used_and_consume_data.py --output-csv-filename output.csv
 ```
 
 ## Output
