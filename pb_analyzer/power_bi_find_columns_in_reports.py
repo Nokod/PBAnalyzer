@@ -8,6 +8,9 @@ from urllib.parse import urlparse, parse_qs, ParseResult
 
 import requests
 
+NEW_HEADERS = ['# of hidden columns', 'All columns', 'Unused columns']
+REGEX_BI_REQUEST = r"var resolvedClusterUri = '(.*?)';"
+
 
 def write_to_csv(file_path: str, values: List[str], overwrite: bool = False) -> None:
     """
@@ -37,7 +40,7 @@ def send_power_bi_request(url: str) -> Optional[str]:
     response: requests.Response = requests.get(url)
     if response.status_code == 200:
         print("Request was successful!")
-        match: Optional[re.Match] = re.search(r"var resolvedClusterUri = '(.*?)';", response.text)
+        match: Optional[re.Match] = re.search(REGEX_BI_REQUEST, response.text)
         if match:
             return match.group(1)
         else:
@@ -48,19 +51,19 @@ def send_power_bi_request(url: str) -> Optional[str]:
         return None
 
 
-def send_exploration_request(region_url: str, resourceKey: str) -> Optional[Dict]:
+def send_exploration_request(region_url: str, resource_key: str) -> Optional[Dict]:
     """
     Sends an exploration request to the Power BI service.
 
     Args:
         region_url (str): The base URL for the Power BI service.
-        resourceKey (str): The resource key for the report.
+        resource_key (str): The resource key for the report.
 
     Returns:
         Optional[Dict]: The JSON response if the request was successful, None otherwise.
     """
-    url: str = f'{region_url}public/reports/{resourceKey}/modelsAndExploration?preferReadOnlySession=true'
-    headers: Dict[str, str] = {'X-PowerBI-ResourceKey': resourceKey}
+    url: str = f'{region_url}public/reports/{resource_key}/modelsAndExploration?preferReadOnlySession=true'
+    headers: Dict[str, str] = {'X-PowerBI-ResourceKey': resource_key}
     response: requests.Response = requests.get(url, headers=headers)
     if response.status_code == 200:
         print('Exploration request was successful.')
@@ -164,7 +167,9 @@ def extract_tables_and_columns(response: dict) -> List[str]:
                 column_name: str = prop.get('Name', 'UnknownColumn')
                 tables_and_columns.append(f"{table_name}.{column_name}")
 
-    return tables_and_columns
+    filtered_cols_and_tables = [item for item in tables_and_columns if
+                                "DateTableTemplate" not in item and "LocalDateTable" not in item]
+    return filtered_cols_and_tables
 
 
 def filter_strings_not_in_json(strings_list: List[str], json_string: dict) -> List[str]:
@@ -209,7 +214,7 @@ def main(csv_file_path: str, output_file_path: str):
         for row in reader:
             rows.append(row)
 
-    write_to_csv(output_file_path, headers + ['# of hidden columns', 'All columns', 'Unused columns'],
+    write_to_csv(output_file_path, headers + NEW_HEADERS,
                  True)
     for row in rows:
         try:
@@ -231,8 +236,9 @@ def main(csv_file_path: str, output_file_path: str):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--exported-power-bi-reports", help="The path to the Power BI reports summary CSV file.")
-    parser.add_argument("--output-file-path", help="The path to the output CSV file.")
+    parser.add_argument("-r", "--exported-power-bi-reports", help="The full path to the Power BI Reports CSV file.",
+                        required=True)
+    parser.add_argument("-o", "--output-file-path", help="The path to the output CSV file.", required=True)
     args = parser.parse_args()
     try:
         main(args.exported_power_bi_reports, args.output_file_path)
