@@ -4,6 +4,13 @@ This project contains two tools for finding unused data sources in your Power BI
 These tools analyze the reports' data models and identify columns not used in visualizations.
 Unwanted access to this data can pose a __security risk__, and it is essential to identify and remove unused
 columns to reduce the risk of data breaches.
+
+BACKGROUND:
+On June 19, 2024, Nokod Security published a warning about the easy exploitation of a data leakage vulnerability in the Microsoft Power BI service. This vulnerability potentially affects tens of thousands of organizations and allows anonymous Internet viewers to access sensitive data, including employee and business data, PHI, and PII. More see: https://nokodsecurity.com/blog/in-plain-sight-how-microsoft-power-bi-reports-expose-sensitive-data-on-the-web/
+
+Nokod Security created the “Power BI Analyzer,” as a simple and free tool for organizations to assess their exposure to this vulnerability. 
+If you need help with this tool, please contact amichai@nokodsecurity.com or uriya@nokodsecurity.com
+
 ## 1st tool - Analyze reports shared with the entire organization
 This tool includes a Python script that interacts with the Power BI API. It sends requests to get the list of all reports shared with the entire organization and analyzes them to find any unused data sources.
 
