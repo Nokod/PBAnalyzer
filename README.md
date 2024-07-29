@@ -11,6 +11,14 @@ On June 19, 2024, Nokod Security published a warning about the easy exploitation
 Nokod Security created the “Power BI Analyzer,” as a simple and free tool for organizations to assess their exposure to this vulnerability. 
 If you need help with this tool, please contact amichai@nokodsecurity.com or uriya@nokodsecurity.com.
 
+# Installation
+Currently, the package is hosted on the test PyPI repository.
+To install the package, run the following command:
+
+```bash
+python3 -m pip install --index-url https://test.pypi.org/simple/ power-bi-analyzer
+```
+
 ## 1st tool - Analyze reports shared with the entire organization
 This tool includes a Python module that interacts with the Power BI API. It sends requests to get the list of all reports shared with the entire organization and analyzes them to find any unused data sources.
 
