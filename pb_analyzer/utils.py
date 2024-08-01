@@ -2,6 +2,8 @@ import csv
 import json
 from typing import Dict, List, Union
 
+from pb_analyzer.const import ResponseKeys
+
 
 def count_hidden_true_in_dict(response: Dict) -> int:
     """
@@ -41,16 +43,17 @@ def _extract_tables_and_columns(response: dict):
         response (dict): The conceptual schema response as a dictionary.
 
     """
-    tables_and_columns = []
-
-    for schema in response.get('schemas', []):
+    columns = []
+    for schema in response.get('schemas', [{}]):
+        if schema.get('error'):
+            break
         for entity in schema.get('schema', {}).get('Entities', []):
             table_name = entity.get('Name', 'UnknownTable')
             for prop in entity.get('Properties', []):
                 column_name = prop.get('Name', 'UnknownColumn')
-                tables_and_columns.append(f"{table_name}.{column_name}")
+                columns.append({'table': table_name, 'column': column_name})
 
-    return tables_and_columns
+    return columns
 
 
 def fetch_columns_and_tables(conceptual_schema: dict):
@@ -62,25 +65,54 @@ def fetch_columns_and_tables(conceptual_schema: dict):
     """
     extracted_cols_and_tables = _extract_tables_and_columns(conceptual_schema)
     filtered_cols_and_tables = [item for item in extracted_cols_and_tables if
-                                "DateTableTemplate" not in item and "LocalDateTable" not in item]
+                                "DateTableTemplate" not in item.get('table') and "LocalDateTable" not in item.get(
+                                    'table')]
     return filtered_cols_and_tables
 
 
-def filter_strings_not_in_json(strings_list: List[str], json_string: dict) -> List[str]:
+def get_classified_columns(report_columns: List[dict], json_string: dict, ) -> tuple[str, List[dict]]:
     """
     Filters out strings from the list that are not found in the JSON string.
 
     Args:
-        strings_list (List[str]): The list of strings to filter.
+        report_columns (List[dict]): The list of strings to filter.
         json_string (dict): The JSON string to check against.
 
     Returns:
-        List[str]: A list of strings that are not found in the JSON string.
+        tuple[str, str, List[dict]]: A tuple containing the unused columns and all columns.
     """
     json_str: str = json.dumps(json_string)
     normalized_json_string: str = json_str.replace('"', '').replace("'", '')
+    unused_columns_and_tables = [column for column in report_columns if
+                                 f'{column[ResponseKeys.TABLE]}.{column[ResponseKeys.COLUMN]}' not in normalized_json_string]
+    tables = {}
+    for column in report_columns:
+        if column[ResponseKeys.TABLE] not in tables:
+            tables[column[ResponseKeys.TABLE]] = []
+        tables[column[ResponseKeys.TABLE]].append(column[ResponseKeys.COLUMN])
 
-    return [string for string in strings_list if string not in normalized_json_string]
+    unused_columns = []
+    for table, columns in tables.items():
+        table_unused_columns = [column[ResponseKeys.COLUMN] for column in unused_columns_and_tables if
+                                column[ResponseKeys.TABLE] == table]
+        if not table_unused_columns:
+            continue
+        columns.sort()
+        table_unused_columns.sort()
+        if table_unused_columns == columns:
+            unused_columns.append(f'{table}: [.*]')
+        elif any([False if column in table_unused_columns else True for column in columns]):
+            unused_columns.append(f'{table}: [{", ".join(table_unused_columns)}]')
+
+    for column in report_columns:
+        column['used'] = False
+        for unused_column in unused_columns_and_tables:
+            if column[ResponseKeys.TABLE] == unused_column[ResponseKeys.TABLE] and column[ResponseKeys.COLUMN] == \
+                    unused_column[ResponseKeys.COLUMN]:
+                column[ResponseKeys.UNUSED] = True
+                break
+
+    return ', '.join(unused_columns), report_columns
 
 
 def write_to_csv(file_path: str, values: List[str], overwrite: bool = False) -> None:
@@ -96,3 +128,15 @@ def write_to_csv(file_path: str, values: List[str], overwrite: bool = False) -> 
     with open(file_path, mode=mode, newline='', encoding='utf-8') as file:
         writer: csv.writer = csv.writer(file)
         writer.writerow(values)
+
+
+def write_to_txt(file_path: str, values: List[str]) -> None:
+    """
+    Writes values to a text file.
+
+    Args:
+        file_path (str): The path to the text file.
+        values (List[str]): The values to write to the text file.
+    """
+    with open(file_path, 'w', encoding='utf-8') as file:
+        file.write('\n'.join(values))

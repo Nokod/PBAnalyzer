@@ -17,24 +17,24 @@ This tool includes a Python module that interacts with the Power BI API. It send
 ### Scripts
 The script runner must have Fabric Admin (or Global Admin) permissions, the minimum permission required to interact with the Power BI Admin API.
 
-- `SharedToWholeOrganizationAnalyzer`: This module fetches and analyzes data from Power BI reports that are shared within an organization. It uses an access token for authentication and interacts with the Power BI API.
+- `SharedReportsAnalyzer`: This module fetches and analyzes data from Power BI reports that are shared within an organization. It uses an access token for authentication and interacts with the Power BI API.
 
 ### Usage
-
-The script requires the name of the output CSV file as an argument.
+You may provide the name of the output CSV file and the summary file as arguments, but they are optional. If you do not provide them, the script will create them in the same directory.
 
 Example usage:
 
 ```ipython
 from power_bi_analyzer import SharedToWholeOrganizationAnalyzer
-SharedToWholeOrganizationAnalyzer(PATH/TO/OUTPUT.csv).analyze()
+SharedReportsAnalyzer('path/to/output.csv').analyze()
 ```
 
 ### Output
 CSV file containing the following columns:
 * Report ID
+* Report name
+* Shared by
 * Number of hidden columns
-* All columns
 * Unused columns
 
 ## 2nd tool - Analyze reports that are shared to the web
@@ -43,7 +43,7 @@ This tool includes a Python module that gets a CSV file with a list of all the U
 ### Scripts
 The script's runner does not require any permissions or credentials. However, before execution, a Power BI admin needs to export a list of embed codes in your organization.
 
-- `EmbedCodeAnalyzer`: This module analyzes data sources of Power BI reports that are shared to the web.
+- `PublicReportsAnalyzer`: This module analyzes data sources of Power BI reports that are shared to the web.
 
 ### requirements
 To execute this script, a Power BI admin must export a CSV file with all your organization's "Embed Codes."
@@ -51,22 +51,22 @@ This CSV contains a list of reports published to the web with their: name, works
 of the report. To export the CSV, use the following link: https://app.powerbi.com/admin-portal/embedCodes and press
 'Export' Or navigate in the Power BI UI to 'Settings' -> 'Admin Portal' -> 'Embed Codes' -> 'Export.'
 ### Usage
-The script requires the name of the output CSV file as an argument and the full path to the Embed Codes CSV file.
+The script requires the full path to the Embed Codes CSV file as an argument. You may also provide the name of the output CSV file and the summary file as arguments but 
+they are optional. If you do not provide them, the script will create them in the same directory.
 
 Example usage:
 
 ```ipython
-from power_bi_analyzer import SharedToWholeOrganizationAnalyzer
-SharedToWholeOrganizationAnalyzer([PATH/TO/EMBED/CODE.csv], [PATH/TO/OUTPUT.csv]).analyze()
+from power_bi_analyzer import PublicReportAnalyzer
+PublicReportsAnalyzer('path/to/embed_code.csv', 'path/to/output.csv').analyze()
 ```
 
 ### Output
 CSV file containing the following columns:
-* Report name 
+* Report name
 * Workspace name
 * Published by
 * Status
 * Embed URL
 * Number of hidden columns
-* All columns
 * Unused columns
