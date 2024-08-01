@@ -4,13 +4,8 @@ setup(
     name='power_bi_analyzer',
     version='0.1.0',
     packages=find_packages(),
-    entry_points={
-        'console_scripts': [
-            'pb_analyzer=pb_analyzer.power_bi_embed_code_analyzer:main',
-        ],
-    },
-    author='Amit Riftin',
-    author_email='amit@nokodsecurity.com',
+    author='Nokod Security',
+    author_email='support@nokodsecurity.com',
     description='A package to analyze Power BI embed codes.',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
