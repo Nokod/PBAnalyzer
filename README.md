@@ -11,23 +11,31 @@ On June 19, 2024, Nokod Security published a warning about the easy exploitation
 Nokod Security created the “Power BI Analyzer,” as a simple and free tool for organizations to assess their exposure to this vulnerability. 
 If you need help with this tool, please contact amichai@nokodsecurity.com or uriya@nokodsecurity.com.
 
+# Installation
+Currently, the package is hosted on the test PyPI repository.
+To install the package, run the following command:
+
+```bash
+python3 -m pip install --index-url https://test.pypi.org/simple/ power-bi-analyzer
+```
+
 ## 1st tool - Analyze reports shared with the entire organization
-This tool includes a Python script that interacts with the Power BI API. It sends requests to get the list of all reports shared with the entire organization and analyzes them to find any unused data sources.
+This tool includes a Python module that interacts with the Power BI API. It sends requests to get the list of all reports shared with the entire organization and analyzes them to find any unused data sources.
 
 ### Scripts
 The script runner must have Fabric Admin (or Global Admin) permissions, the minimum permission required to interact with the Power BI Admin API.
 
-- `power_bi_get_report_used_and_consume_data.py`: This script fetches and analyzes data from Power BI reports that are shared within an organization. It uses an access token for authentication and interacts with the Power BI API.
+- `SharedToWholeOrganizationAnalyzer`: This module fetches and analyzes data from Power BI reports that are shared within an organization. It uses an access token for authentication and interacts with the Power BI API.
 
 ### Usage
 
-The script requires the name of the output CSV file as a command-line argument.
-
+The script requires the name of the output CSV file as an argument.
 
 Example usage:
 
-```bash
-python power_bi_get_report_used_and_consume_data.py --output-csv-filename output.csv
+```ipython
+from power_bi_analyzer import SharedToWholeOrganizationAnalyzer
+SharedToWholeOrganizationAnalyzer(PATH/TO/OUTPUT.csv).analyze()
 ```
 
 ### Output
@@ -38,12 +46,12 @@ CSV file containing the following columns:
 * Unused columns
 
 ## 2nd tool - Analyze reports that are shared to the web
-This tool includes a Python script that gets a CSV file with a list of all the URLs of reports published to the web and analyzes them to find any unused data sources.
+This tool includes a Python module that gets a CSV file with a list of all the URLs of reports published to the web and analyzes them to find any unused data sources.
 
 ### Scripts
 The script's runner does not require any permissions or credentials. However, before execution, a Power BI admin needs to export a list of embed codes in your organization.
 
-- `power_bi_find_columns_in_reports.py`: This script analyzes data sources of Power BI reports that are shared to the web.
+- `EmbedCodeAnalyzer`: This module analyzes data sources of Power BI reports that are shared to the web.
 
 ### requirements
 To execute this script, a Power BI admin must export a CSV file with all your organization's "Embed Codes."
@@ -51,13 +59,13 @@ This CSV contains a list of reports published to the web with their: name, works
 of the report. To export the CSV, use the following link: https://app.powerbi.com/admin-portal/embedCodes and press
 'Export' Or navigate in the Power BI UI to 'Settings' -> 'Admin Portal' -> 'Embed Codes' -> 'Export.'
 ### Usage
-
-The script requires the name of the output CSV file as a command-line argument and the full path to the Embed Codes CSV file.
+The script requires the name of the output CSV file as an argument and the full path to the Embed Codes CSV file.
 
 Example usage:
 
-```bash
-python power_bi_find_columns_in_reports.py --exported-embed-codes-table "C:\Users\MyUserName\Downloads\Embed Codes.csv" --output-csv-filename "C:\Users\MyUserName\Downloads\output.csv"
+```ipython
+from power_bi_analyzer import SharedToWholeOrganizationAnalyzer
+SharedToWholeOrganizationAnalyzer([PATH/TO/EMBED/CODE.csv], [PATH/TO/OUTPUT.csv]).analyze()
 ```
 
 ### Output
