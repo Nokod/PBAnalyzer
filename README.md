@@ -32,9 +32,8 @@ You may provide the name of the output CSV file and the summary file as argument
 
 Example usage:
 
-```ipython
-from power_bi_analyzer import SharedToWholeOrganizationAnalyzer
-SharedReportsAnalyzer('path/to/output.csv').analyze()
+```bash
+shared_reports_analyzer ----results_output_path path/to/output.csv --summary_output_path path/to/summary.txt
 ```
 
 ### Output
@@ -64,9 +63,8 @@ they are optional. If you do not provide them, the script will create them in th
 
 Example usage:
 
-```ipython
-from power_bi_analyzer import PublicReportAnalyzer
-PublicReportsAnalyzer('path/to/embed_code.csv', 'path/to/output.csv').analyze()
+```bash
+public_reports_analyzer --embed_codes_path path/to/embed_code.csv --results_output_path path/to/output.csv --summary_output_path path/to/summary.txt
 ```
 
 ### Output

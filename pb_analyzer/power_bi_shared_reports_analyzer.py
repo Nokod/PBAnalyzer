@@ -1,15 +1,14 @@
 import argparse
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
 import msal
 import requests
-from alive_progress import alive_bar
 from colorama import Fore
 
-from pb_analyzer.BaseAnalyzer import BaseAnalyzer
+from pb_analyzer.base_analyzer import BaseAnalyzer
 from pb_analyzer.const import Requests, ResponseKeys, SHARED_TO_ORG_HEADERS
 from pb_analyzer.utils import count_hidden_true_in_dict, fetch_columns_and_tables, get_classified_columns, \
     write_to_csv
@@ -44,9 +43,8 @@ class SharedReportsAnalyzer(BaseAnalyzer):
         else:
             summary_output_path = os.path.join(os.path.dirname(__file__), f'PBAnalyzerResults_{time}.txt')
 
-        self._debug = debug
         super().__init__('Reports shared to whole organization analyzer', results_output_path, is_default_result_path,
-                         summary_output_path, is_default_summary_path)
+                         summary_output_path, is_default_summary_path, debug)
 
     @staticmethod
     def _extract_artifact_ids(response: dict):
@@ -78,8 +76,6 @@ class SharedReportsAnalyzer(BaseAnalyzer):
         if response.status_code == 200:
             response_data = response.json()
             return response_data
-        else:
-            return None
 
     @staticmethod
     def _links_shared_to_whole_organization_api(token: str):
@@ -89,8 +85,6 @@ class SharedReportsAnalyzer(BaseAnalyzer):
         if response.status_code == 200:
             response_data = response.json()
             return response_data
-        else:
-            return None
 
     @staticmethod
     def _send_push_access_request(token: str, report_id: str, region: str):
@@ -100,8 +94,6 @@ class SharedReportsAnalyzer(BaseAnalyzer):
         if response.status_code == 200:
             response_data = response.json()
             return response_data
-        else:
-            return None
 
     @staticmethod
     def _send_exploration_request(token: str, artifact_id: str, region: str):
@@ -129,30 +121,28 @@ class SharedReportsAnalyzer(BaseAnalyzer):
         url = urlparse(response.get(ResponseKeys.REGION))
         return url.netloc
 
-    def _run_analysis(self, region, reports, token):
-        success_count = 0
-        with alive_bar(len(reports)) as bar:
-            start_time = datetime.now()
-            for report_id, sharer_name, name in reports:
-                try:
-                    response_data = self._send_push_access_request(token, report_id, region)
-                    if response_data:
-                        conceptual_schema, exploration_response = self._get_report_data(region, response_data, token)
-                        num_of_hidden = count_hidden_true_in_dict(conceptual_schema)
-                        columns_and_tables = fetch_columns_and_tables(conceptual_schema)
-                        unused_message, all_columns = get_classified_columns(columns_and_tables, exploration_response)
-                        self._insert_all_columns(all_columns, num_of_hidden)
-                        if unused_message:
-                            self._reports_with_unused_columns += 1
-                            write_to_csv(self.result_output_path,
-                                         [report_id, name, sharer_name, num_of_hidden, unused_message])
-                        success_count += 1
-                except Exception as e:
-                    if self._debug:
-                        print(Fore.RED + str(e))
-                bar()
-            end_time = datetime.now()
-        return end_time, reports, start_time, success_count
+    def _process_report(self, report, bar, start_time, *args):
+        region, token = args
+        report_id, sharer_name, name = report
+        try:
+            if datetime.now() - start_time > timedelta(minutes=10):
+                raise TimeoutError('Passes the 10 minutes mark.')
+
+            response_data = self._send_push_access_request(token, report_id, region)
+            if response_data:
+                conceptual_schema, exploration_response = self._get_report_data(region, response_data, token)
+                num_of_hidden = count_hidden_true_in_dict(conceptual_schema)
+                columns_and_tables = fetch_columns_and_tables(conceptual_schema)
+                unused_message, all_columns = get_classified_columns(columns_and_tables, exploration_response)
+                self._insert_all_columns(all_columns, num_of_hidden)
+                self._success_count += 1
+                if unused_message:
+                    self._reports_with_unused_columns += 1
+                    self._results.append([report_id, name, sharer_name, num_of_hidden, unused_message])
+        except Exception as e:
+            if self._debug:
+                print(Fore.RED + str(e))
+        bar()
 
     def _intro(self):
         self._handle_input()
@@ -164,29 +154,43 @@ class SharedReportsAnalyzer(BaseAnalyzer):
         all_shared_res = self._links_shared_to_whole_organization_api(token)
         reports = self._extract_artifact_ids(all_shared_res)
         region = self._extract_region(all_shared_res)
-        write_to_csv(self.result_output_path, SHARED_TO_ORG_HEADERS, True)
-        average_time_per_report = 3
+        write_to_csv(self._result_output_path, [SHARED_TO_ORG_HEADERS], True)
+        average_time_per_report = 0.5
         estimated_time = len(reports) * average_time_per_report
         print(Fore.GREEN + f'Found {len(reports)} reports shared to whole organization.')
         print(Fore.YELLOW + f'Estimated time to analyze all reports: {estimated_time} seconds.')
         return region, reports, token
 
     def _get_report_data(self, region, response_data, token):
-        artifact_id = response_data['entityKey']['id']
-        model_id = next(item['id'] for item in response_data['relatedEntityKeys'] if item['type'] == 4)
+        artifact_id = response_data.get(ResponseKeys.ENTITY_KEY, {}).get(ResponseKeys.ID)
+        model_id = next(item.get(ResponseKeys.ID) for item in response_data.get(ResponseKeys.RELATED_ENTITY_KEY) if
+                        item.get(ResponseKeys.TYPE) == 4)
         conceptual_schema = self._send_conceptual_schema_request(token, model_id, region)
         exploration_response = self._send_exploration_request(token, artifact_id, region)
         return conceptual_schema, exploration_response
 
     def analyze(self):
         try:
-            self.welcome_text()
+            self._welcome_text()
             region, reports, token = self._intro()
-            end_time, reports, start_time, success_count = (
-                self._run_analysis(region, reports, token))
-            self.outro(end_time, reports, start_time, success_count)
+            end_time, reports, start_time = (self._run_analysis(reports, region, token))
+            self._outro(end_time, reports, start_time)
         except Exception as e:
             print(Fore.RED + 'Exiting due to an error.')
             if self._debug:
-                raise
+                print(Fore.RED + str(e))
 
+
+def main():
+    parser = argparse.ArgumentParser(description='Analyze Shared Power BI Reports')
+    parser.add_argument('--results_output_path', type=str, help='Path to the output CSV file', default=None)
+    parser.add_argument('--summary_output_path', type=str, help='Path to the summary TXT file', default=None)
+    parser.add_argument('--debug', action='store_true', help='Enable debug mode')
+    args = parser.parse_args()
+
+    analyzer = SharedReportsAnalyzer(
+        results_output_path=args.results_output_path,
+        summary_output_path=args.summary_output_path,
+        debug=args.debug
+    )
+    analyzer.analyze()
