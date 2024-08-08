@@ -115,7 +115,7 @@ def get_classified_columns(report_columns: List[dict], json_string: dict, ) -> t
     return ', '.join(unused_columns), report_columns
 
 
-def write_to_csv(file_path: str, values: List[str], overwrite: bool = False) -> None:
+def write_to_csv(file_path: str, values: List[List], overwrite: bool = False) -> None:
     """
     Writes values to a CSV file.
 
@@ -127,7 +127,7 @@ def write_to_csv(file_path: str, values: List[str], overwrite: bool = False) -> 
     mode: str = 'w' if overwrite else 'a'
     with open(file_path, mode=mode, newline='', encoding='utf-8') as file:
         writer: csv.writer = csv.writer(file)
-        writer.writerow(values)
+        writer.writerows(values)
 
 
 def write_to_txt(file_path: str, values: List[str]) -> None:

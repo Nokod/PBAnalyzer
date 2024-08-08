@@ -4,16 +4,15 @@ import csv
 import json
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Union
 from urllib.parse import urlparse, parse_qs, ParseResult
 
 import requests
-from alive_progress import alive_bar
 from colorama import Fore
 
-from pb_analyzer.BaseAnalyzer import BaseAnalyzer
-from pb_analyzer.const import PublicRequests, REGEX_BI_REQUEST, NEW_HEADERS
+from pb_analyzer.base_analyzer import BaseAnalyzer
+from pb_analyzer.const import PublicRequests, REGEX_BI_REQUEST, NEW_HEADERS, ResponseKeys
 from pb_analyzer.utils import count_hidden_true_in_dict, get_classified_columns, \
     write_to_csv, fetch_columns_and_tables
 
@@ -32,29 +31,25 @@ class PublicReportsAnalyzer(BaseAnalyzer):
         """
 
         time = int(round(datetime.now().timestamp()))
-        self.csv_file_path = embed_codes_path
+        self._csv_file_path = embed_codes_path
         is_default_results_path = True
         if results_output_path:
             if not results_output_path.endswith('.csv'):
                 raise ValueError('Output file must be a CSV file.')
             is_default_results_path = False
         else:
-            results_output_path = os.path.join(os.path.dirname(__file__), f'SharedReportsWithUnusedData_{time}.csv')
+            results_output_path = os.path.join(os.path.dirname(__file__), f'PublicReportsWithUnusedData_{time}.csv')
 
         is_default_summary_path = True
         if summary_output_path:
             if not summary_output_path.endswith('.txt'):
                 raise ValueError('Output file must be a TXT file.')
-            self.is_default_result_path = False
+            self._is_default_result_path = False
         else:
             summary_output_path = os.path.join(os.path.dirname(__file__), f'PBAnalyzerResults_{time}.txt')
 
-        super().__init__('Analyze Reports Shared with the Entire Organization', results_output_path,
-                         is_default_results_path, summary_output_path, is_default_summary_path)
-        self._all_columns = []
-        self._reports_with_unused_columns = 0
-        self._reports_with_hidden_columns = 0
-        self._debug = debug
+        super().__init__('Analyze Public Reports', results_output_path,
+                         is_default_results_path, summary_output_path, is_default_summary_path, debug)
 
     @staticmethod
     def _send_power_bi_request(url: str) -> Optional[str]:
@@ -63,10 +58,6 @@ class PublicReportsAnalyzer(BaseAnalyzer):
             match: Optional[re.Match] = re.search(REGEX_BI_REQUEST, response.text)
             if match:
                 return match.group(1)
-            else:
-                return None
-        else:
-            return None
 
     @staticmethod
     def _send_exploration_request(region_url: str, resource_key: str) -> Optional[Dict]:
@@ -77,17 +68,15 @@ class PublicReportsAnalyzer(BaseAnalyzer):
         if response.status_code == 200:
             return response.json()
         else:
-            return None
+            response.raise_for_status()
 
     @staticmethod
     def _get_model_id(json_response: Union[str, Dict]) -> Optional[str]:
         try:
             data: Dict = json.loads(json_response) if isinstance(json_response, str) else json_response
-            models: List[Dict] = data.get('models', [])
+            models: List[Dict] = data.get(ResponseKeys.MODELS, [{}])
             if models:
-                return models[0].get('id')
-            else:
-                return None
+                return models[0].get(ResponseKeys.ID)
         except (json.JSONDecodeError, KeyError, TypeError) as e:
             return None
 
@@ -101,7 +90,6 @@ class PublicReportsAnalyzer(BaseAnalyzer):
             return response.json()
         else:
             response.raise_for_status()
-            return None
 
     @staticmethod
     def _decode_url(encoded_url: str) -> dict:
@@ -111,38 +99,38 @@ class PublicReportsAnalyzer(BaseAnalyzer):
         decoded_url: str = decoded_bytes.decode('utf-8')
         return json.loads(decoded_url)
 
-    def _run_analysis(self, rows):
-        start_time = datetime.now()
-        success_count = 0
-        with alive_bar(len(rows), bar='blocks') as bar:
-            for row in rows:
-                try:
-                    conceptual_schema, exploration_response = self._get_report_data(row)
-                    report_columns = fetch_columns_and_tables(conceptual_schema)
-                    num_of_hidden = count_hidden_true_in_dict(conceptual_schema)
-                    unused_message, all_columns = get_classified_columns(report_columns, exploration_response)
-                    self._insert_all_columns(all_columns, num_of_hidden)
-                    if unused_message:
-                        self._reports_with_unused_columns += 1
-                        write_to_csv(self.result_output_path, row[:-1] + [num_of_hidden, unused_message])
-                    success_count += 1
-                except Exception as e:
-                    if self._debug:
-                        print(Fore.RED + f'Failed to analyze report: {row[1]}. Error: {str(e)}')
-                bar()
-            end_time = datetime.now()
-        return end_time, rows, start_time, success_count
+    def _process_report(self, row, bar, start_time, *args):
+        try:
+            if datetime.now() - start_time > timedelta(minutes=10):
+                raise TimeoutError('Passes the 10 minutes mark.')
+
+            conceptual_schema, exploration_response = self._get_report_data(row)
+            report_columns = fetch_columns_and_tables(conceptual_schema)
+            num_of_hidden = count_hidden_true_in_dict(conceptual_schema)
+            report_with_unused, all_columns = get_classified_columns(report_columns, exploration_response)
+            self._insert_all_columns(all_columns, num_of_hidden)
+            self._success_count += 1
+            if report_with_unused:
+                self._reports_with_unused_columns += 1
+                self._results.append(row[:-1] + [num_of_hidden, report_with_unused])
+        except TimeoutError as e:
+            raise e
+        except Exception as e:
+            if self._debug:
+                print(Fore.RED + str(e))
+        bar()
+        return
 
     def _intro(self):
         self._handle_input()
         rows = []
-        with open(self.csv_file_path, mode='r', encoding='utf-8') as file:
+        with open(self._csv_file_path, mode='r', encoding='utf-8') as file:
             reader = csv.reader(file)
             headers = next(reader)
             [rows.append(row) for row in reader]
-        write_to_csv(self.result_output_path, headers + NEW_HEADERS, True)
-        average_time_per_report = 1.5
-        estimated_time = len(rows) * average_time_per_report
+        write_to_csv(self._result_output_path, [headers + NEW_HEADERS], True)
+        average_time_per_report = 0.4
+        estimated_time = round(len(rows) * average_time_per_report, 2)
         print(Fore.GREEN + f'Found {len(rows)} reports to analyze.')
         print(Fore.YELLOW + f'Estimated time to analyze all reports: {estimated_time} seconds.')
         if estimated_time > 60 * 10:
@@ -163,11 +151,28 @@ class PublicReportsAnalyzer(BaseAnalyzer):
 
     def analyze(self):
         try:
-            self.welcome_text()
+            self._welcome_text()
             rows = self._intro()
-            end_time, rows, start_time, success_count = self._run_analysis(rows)
-            self.outro(end_time, rows, start_time, success_count)
+            end_time, rows, start_time = self._run_analysis(rows)
+            self._outro(end_time, rows, start_time)
         except Exception as e:
             print(Fore.RED + 'Exiting due to an error.')
             if self._debug:
                 print(Fore.RED + str(e))
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Analyze Public Power BI Reports')
+    parser.add_argument('--embed-codes-path', type=str, help='Path to the Power BI Reports CSV file', required=True)
+    parser.add_argument('--results_output_path', type=str, help='Path to the output CSV file', default=None)
+    parser.add_argument('--summary_output_path', type=str, help='Path to the summary TXT file', default=None)
+    parser.add_argument('--debug', action='store_true', help='Enable debug mode')
+    args = parser.parse_args()
+
+    analyzer = PublicReportsAnalyzer(
+        embed_codes_path=args.embed_codes_path,
+        results_output_path=args.results_output_path,
+        summary_output_path=args.summary_output_path,
+        debug=args.debug
+    )
+    analyzer.analyze()

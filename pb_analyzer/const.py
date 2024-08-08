@@ -35,3 +35,8 @@ class ResponseKeys:
     TABLE = 'table'
     COLUMN = 'column'
     UNUSED = 'unused'
+    MODELS = 'models'
+    ID = 'id'
+    ENTITY_KEY = 'entityKey'
+    RELATED_ENTITY_KEY = 'relatedEntityKey'
+    TYPE = 'type'
