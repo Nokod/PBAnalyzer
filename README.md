@@ -16,7 +16,7 @@ Currently, the package is hosted on the test PyPI repository.
 To install the package, run the following command:
 
 ```bash
-python3 -m pip install --index-url https://test.pypi.org/simple/ power-bi-analyzer
+python3 -m pip install power-bi-analyzer
 ```
 
 ## 1st tool - Analyze reports shared with the entire organization
@@ -33,7 +33,7 @@ You may provide the name of the output CSV file and the summary file as argument
 Example usage:
 
 ```bash
-shared_reports_analyzer ----results_output_path path/to/output.csv --summary_output_path path/to/summary.txt
+shared-reports-analyzer --output-folder "path/to/output folder"
 ```
 
 ### Output
@@ -64,7 +64,7 @@ they are optional. If you do not provide them, the script will create them in th
 Example usage:
 
 ```bash
-public_reports_analyzer --embed_codes_path path/to/embed_code.csv --results_output_path path/to/output.csv --summary_output_path path/to/summary.txt
+public-reports-analyzer --embed_codes_path "path/to/embed code.csv" --output-folder "path/to/output folder"
 ```
 
 ### Output

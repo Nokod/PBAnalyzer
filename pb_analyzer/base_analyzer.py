@@ -1,4 +1,5 @@
 import concurrent.futures
+import os.path
 from abc import abstractmethod
 from datetime import datetime
 from time import sleep
@@ -12,12 +13,11 @@ from pb_analyzer.utils import write_to_txt, write_to_csv
 
 class BaseAnalyzer:
     def __init__(self, tool: str, result_output_path: str, is_default_results_path: bool, results_output_path: str,
-                 is_default_summary_path: bool, debug: bool = False):
+                 debug: bool = False):
         self._debug = debug
         self._result_output_path = result_output_path
         self._summary_output_path = results_output_path
         self._is_default_results_path = is_default_results_path
-        self._is_default_summary_path = is_default_summary_path
         self._results = []
         self._tool = tool
         self._unused_columns = []
@@ -41,27 +41,41 @@ class BaseAnalyzer:
                             and existing_column[ResponseKeys.COLUMN] == column[ResponseKeys.COLUMN]):
                         existing_column[ResponseKeys.UNUSED] = True
 
-    def _insert_new_path(self, path, suffix: str):
+    @staticmethod
+    def _insert_new_path(path, suffix: str):
         print(Fore.YELLOW + f'Default output {suffix.upper()} file: {path}')
         print(Fore.YELLOW + f'Press Enter to continue with the default path or type a new path.')
         user_input = input()
         if user_input:
             if user_input.endswith(f'.{suffix}'):
-                print(Fore.YELLOW + f'Output {suffix.upper()} file: {self._result_output_path}')
+                print(Fore.YELLOW + f'Output {suffix.upper()} file: {user_input}')
                 return user_input
             else:
                 print(Fore.RED + 'Invalid file path. Using default path.')
+        return path
 
     @abstractmethod
     def _intro(self):
         pass
 
     def _handle_input(self):
-        if self._is_default_results_path:
-            self._result_output_path = self._insert_new_path(self._result_output_path, 'csv')
+        if not self._is_default_results_path:
+            return
 
-        if self._is_default_summary_path:
-            self._summary_output_path = self._insert_new_path(self._summary_output_path, 'txt')
+        print(Fore.YELLOW + f'Default output CSV file: {self._result_output_path}')
+        print(Fore.YELLOW + f'Default output TXT file: {self._summary_output_path}')
+        print(Fore.YELLOW + f'Press Enter to continue with the default paths or type a different directory.')
+        user_input = input()
+        if user_input:
+            if '.' in user_input.split('/')[-1]:
+                print(Fore.RED + 'Invalid directory. Using default paths.')
+                return
+            if os.path.isdir(user_input) or not os.path.exists(user_input):
+                os.makedirs(user_input, exist_ok=True)
+                self._result_output_path = os.path.join(user_input, os.path.basename(self._result_output_path))
+                self._summary_output_path = os.path.join(user_input, os.path.basename(self._summary_output_path))
+        print(Fore.GREEN + f'Output CSV file: {self._result_output_path}')
+        print(Fore.GREEN + f'Output TXT file: {self._summary_output_path}')
 
     @abstractmethod
     def _process_report(self, row, bar, start_time, *args):
@@ -159,4 +173,3 @@ class BaseAnalyzer:
         print()
         print(Fore.GREEN + 'Full analysis saved to ' + self._result_output_path)
         print(Fore.GREEN + 'Results saved to ' + self._summary_output_path)
-
