@@ -12,7 +12,6 @@ Nokod Security created the “Power BI Analyzer,” as a simple and free tool fo
 If you need help with this tool, please contact amichai@nokodsecurity.com or uriya@nokodsecurity.com.
 
 # Installation
-Currently, the package is hosted on the test PyPI repository.
 To install the package, run the following command:
 
 ```bash
@@ -64,7 +63,7 @@ they are optional. If you do not provide them, the script will create them in th
 Example usage:
 
 ```bash
-public-reports-analyzer --embed_codes_path "path/to/embed code.csv" --output-folder "path/to/output folder"
+public-reports-analyzer --embed-codes-path "path/to/embed code.csv" --output-folder "path/to/output folder"
 ```
 
 ### Output
