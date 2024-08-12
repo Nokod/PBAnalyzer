@@ -18,38 +18,56 @@ from pb_analyzer.utils import count_hidden_true_in_dict, get_classified_columns,
 
 
 class PublicReportsAnalyzer(BaseAnalyzer):
-    def __init__(self, embed_codes_path: str, results_output_path: str = None, summary_output_path: str = None,
-                 debug: bool = False):
+    def __init__(self, embed_codes_file_path: str, output_folder: str = None, debug: bool = False):
         """
         Args:
-            embed_codes_path:  The full path to the Power BI Reports CSV file.
-            results_output_path:  The path to the output CSV file.
-            summary_output_path:  The path to the summary TXT file.
+            embed_codes_file_path:  The full path to the Power BI Reports CSV file.
+            output_folder: The path to the output folder.
 
         Example usage:
         PublicReportAnalyzer('C:/Users/username/Downloads/PowerBIReports.csv', 'C:/Users/username/Downloads/Output.csv').analyze()
         """
-
         time = int(round(datetime.now().timestamp()))
-        self._csv_file_path = embed_codes_path
+        try:
+            self._validate_embed_codes_file(embed_codes_file_path)
+        except (FileNotFoundError, ValueError) as e:
+            print(Fore.RED + str(e))
+            exit(1)
+        self._embed_codes_file_path = embed_codes_file_path
         is_default_results_path = True
-        if results_output_path:
-            if not results_output_path.endswith('.csv'):
-                raise ValueError('Output file must be a CSV file.')
-            is_default_results_path = False
-        else:
-            results_output_path = os.path.join(os.path.dirname(__file__), f'PublicReportsWithUnusedData_{time}.csv')
 
-        is_default_summary_path = True
-        if summary_output_path:
-            if not summary_output_path.endswith('.txt'):
-                raise ValueError('Output file must be a TXT file.')
-            self._is_default_result_path = False
-        else:
-            summary_output_path = os.path.join(os.path.dirname(__file__), f'PBAnalyzerResults_{time}.txt')
+        results_output_path = os.path.join(os.getcwd(), f'PublicReportsWithUnusedData_{time}.csv')
+        summary_output_path = os.path.join(os.getcwd(), f'PBAnalyzerResults_{time}.txt')
+
+        if output_folder:
+            if '.' in os.path.basename(output_folder):
+                print(Fore.RED + 'Invalid output folder path. Using default path.')
+            if not os.path.isdir(output_folder):
+                os.makedirs(output_folder)
+            is_default_results_path = False
+            results_output_path = os.path.join(output_folder, f'PublicReportsWithUnusedData_{time}.csv')
+            summary_output_path = os.path.join(output_folder, f'PBAnalyzerResults_{time}.txt')
 
         super().__init__('Analyze Public Reports', results_output_path,
-                         is_default_results_path, summary_output_path, is_default_summary_path, debug)
+                         is_default_results_path, summary_output_path, debug)
+
+    @staticmethod
+    def _validate_embed_codes_file(embed_codes_path: str):
+        if not os.path.isfile(embed_codes_path):
+            raise FileNotFoundError(f'File not found: {embed_codes_path}')
+
+        if not embed_codes_path.lower().endswith('.csv'):
+            raise ValueError(f'File must be a CSV: {embed_codes_path}')
+
+        expected_headers = ['Report name', 'Workspace name', 'Published by', 'Status', 'Embed URL']
+
+        with open(embed_codes_path, mode='r', encoding='utf-8-sig') as file:
+            reader = csv.reader(file)
+            headers = next(reader, None)
+
+            if headers != expected_headers:
+                raise ValueError(
+                    f'CSV file does not have the expected headers. Are you sure this is an Embed Codes CSV file?')
 
     @staticmethod
     def _send_power_bi_request(url: str) -> Optional[str]:
@@ -124,7 +142,7 @@ class PublicReportsAnalyzer(BaseAnalyzer):
     def _intro(self):
         self._handle_input()
         rows = []
-        with open(self._csv_file_path, mode='r', encoding='utf-8') as file:
+        with open(self._embed_codes_file_path, mode='r', encoding='utf-8') as file:
             reader = csv.reader(file)
             headers = next(reader)
             [rows.append(row) for row in reader]
@@ -164,15 +182,13 @@ class PublicReportsAnalyzer(BaseAnalyzer):
 def main():
     parser = argparse.ArgumentParser(description='Analyze Public Power BI Reports')
     parser.add_argument('--embed-codes-path', type=str, help='Path to the Power BI Reports CSV file', required=True)
-    parser.add_argument('--results_output_path', type=str, help='Path to the output CSV file', default=None)
-    parser.add_argument('--summary_output_path', type=str, help='Path to the summary TXT file', default=None)
+    parser.add_argument('--output-folder', type=str, help='The path to the output folder')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
     args = parser.parse_args()
 
     analyzer = PublicReportsAnalyzer(
-        embed_codes_path=args.embed_codes_path,
-        results_output_path=args.results_output_path,
-        summary_output_path=args.summary_output_path,
+        embed_codes_file_path=args.embed_codes_path,
+        output_folder=args.output_folder,
         debug=args.debug
     )
     analyzer.analyze()

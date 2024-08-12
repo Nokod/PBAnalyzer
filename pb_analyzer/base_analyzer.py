@@ -1,4 +1,5 @@
 import concurrent.futures
+import os.path
 from abc import abstractmethod
 from datetime import datetime
 from time import sleep
@@ -12,12 +13,11 @@ from pb_analyzer.utils import write_to_txt, write_to_csv
 
 class BaseAnalyzer:
     def __init__(self, tool: str, result_output_path: str, is_default_results_path: bool, results_output_path: str,
-                 is_default_summary_path: bool, debug: bool = False):
+                 debug: bool = False):
         self._debug = debug
         self._result_output_path = result_output_path
         self._summary_output_path = results_output_path
         self._is_default_results_path = is_default_results_path
-        self._is_default_summary_path = is_default_summary_path
         self._results = []
         self._tool = tool
         self._unused_columns = []
@@ -41,27 +41,40 @@ class BaseAnalyzer:
                             and existing_column[ResponseKeys.COLUMN] == column[ResponseKeys.COLUMN]):
                         existing_column[ResponseKeys.UNUSED] = True
 
-    def _insert_new_path(self, path, suffix: str):
+    @staticmethod
+    def _insert_new_path(path, suffix: str):
         print(Fore.YELLOW + f'Default output {suffix.upper()} file: {path}')
         print(Fore.YELLOW + f'Press Enter to continue with the default path or type a new path.')
         user_input = input()
         if user_input:
             if user_input.endswith(f'.{suffix}'):
-                print(Fore.YELLOW + f'Output {suffix.upper()} file: {self._result_output_path}')
+                print(Fore.YELLOW + f'Output {suffix.upper()} file: {user_input}')
                 return user_input
             else:
                 print(Fore.RED + 'Invalid file path. Using default path.')
+        return path
 
     @abstractmethod
     def _intro(self):
         pass
 
     def _handle_input(self):
-        if self._is_default_results_path:
-            self._result_output_path = self._insert_new_path(self._result_output_path, 'csv')
+        if not self._is_default_results_path:
+            return
 
-        if self._is_default_summary_path:
-            self._summary_output_path = self._insert_new_path(self._summary_output_path, 'txt')
+        print(Fore.YELLOW + f'Default output directory: {os.path.dirname(self._result_output_path)}')
+        print(Fore.YELLOW + f'Press Enter to continue with the default directory or type a new directory.')
+        user_input = input()
+        if user_input:
+            if '.' in user_input.split('/')[-1]:
+                print(Fore.RED + 'Invalid directory. Using default paths.')
+                return
+            if os.path.isdir(user_input) or not os.path.exists(user_input):
+                os.makedirs(user_input, exist_ok=True)
+                self._result_output_path = os.path.join(user_input, os.path.basename(self._result_output_path))
+                self._summary_output_path = os.path.join(user_input, os.path.basename(self._summary_output_path))
+        print(Fore.GREEN + f'Output directory: {os.path.dirname(self._result_output_path)}')
+        print()
 
     @abstractmethod
     def _process_report(self, row, bar, start_time, *args):
@@ -146,17 +159,28 @@ class BaseAnalyzer:
             'Reports with unused columns: ' + str(self._reports_with_unused_columns),
             'Reports with hidden columns: ' + str(self._reports_with_hidden_columns),
             'Scan time: ' + str(end_time - start_time),
+            ''
         ]
 
         for line in results:
             print(Fore.WHITE + line)
 
+        error_messages = []
+        if self._success_count != len(rows):
+            if self._tool == 'Analyze Public Reports':
+                error_messages = [
+                    '',
+                    f'Failed to analyze {len(rows) - self._success_count} reports. This failure may be due to several reasons, such as: ',
+                    'Invalid embed code, use of RLS features, etc.'
+                ]
+
         title = ['', 'Project: Power BI Analyzer', f'Tool: {self._tool}', '']
         header = ['=' * 65, 'Results'.center(65), '=' * 65, '']
-        footer = ['=' * 65, '', 'Full analysis saved to ' + self._result_output_path]
-        write_to_txt(self._summary_output_path, title + header + results + footer)
+        closing = ['=' * 65]
+        footer = ['', 'Full analysis saved to ' + self._result_output_path]
+        write_to_txt(self._summary_output_path, title + header + results + closing + error_messages + footer)
         print(Fore.CYAN + "=" * 65)
+        [print(Fore.RED + line) for line in error_messages]
         print()
         print(Fore.GREEN + 'Full analysis saved to ' + self._result_output_path)
         print(Fore.GREEN + 'Results saved to ' + self._summary_output_path)
-

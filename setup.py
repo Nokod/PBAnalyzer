@@ -1,13 +1,16 @@
 from setuptools import setup, find_packages
 
+with open('requirements.txt') as f:
+    required = f.read().splitlines()
+
 setup(
     name='power_bi_analyzer',
-    version='0.1.1',
+    version='1.0.0',
     packages=find_packages(),
     entry_points={
         'console_scripts': [
-            'public_reports_analyzer=pb_analyzer.power_bi_public_report_analyzer:main',
-            'shared_reports_analyzer=pb_analyzer.power_bi_shared_reports_analyzer:main',
+            'public-reports-analyzer=pb_analyzer.power_bi_public_report_analyzer:main',
+            'shared-reports-analyzer=pb_analyzer.power_bi_shared_reports_analyzer:main',
         ]
     },
     author='Nokod Security',
@@ -22,4 +25,5 @@ setup(
         'Operating System :: OS Independent',
     ],
     python_requires='>=3.6',
+    install_requires=required,
 )

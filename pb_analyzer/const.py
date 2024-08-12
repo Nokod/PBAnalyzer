@@ -38,5 +38,5 @@ class ResponseKeys:
     MODELS = 'models'
     ID = 'id'
     ENTITY_KEY = 'entityKey'
-    RELATED_ENTITY_KEY = 'relatedEntityKey'
+    RELATED_ENTITY_KEY = 'relatedEntityKeys'
     TYPE = 'type'

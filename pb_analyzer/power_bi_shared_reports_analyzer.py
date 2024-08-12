@@ -15,36 +15,32 @@ from pb_analyzer.utils import count_hidden_true_in_dict, fetch_columns_and_table
 
 
 class SharedReportsAnalyzer(BaseAnalyzer):
-    def __init__(self, results_output_path: str = None, summary_output_path: str = None,
-                 debug: bool = False):
+    def __init__(self, output_folder: str = None, debug: bool = False):
         """
 
         Args:
-            results_output_path: The path to the output CSV file.
-            summary_output_path: The path to the summary TXT file.
+            output_folder: The path to the output folder.
 
         Example usage:
         SharedToWholeOrganizationAnalyzer('C:/Users/username/Downloads/Output.csv', 'C:/Users/username/Downloads/Results.txt').analyze()
         """
         time = int(round(datetime.now().timestamp()))
         is_default_result_path = True
-        if results_output_path:
-            if not results_output_path.endswith('.csv'):
-                raise ValueError('Output file must be a CSV file.')
-            is_default_result_path = False
-        else:
-            results_output_path = os.path.join(os.path.dirname(__file__), f'SharedReportsWithUnusedData_{time}.csv')
 
-        is_default_summary_path = True
-        if summary_output_path:
-            if not summary_output_path.endswith('.txt'):
-                raise ValueError('Output file must be a TXT file.')
-            is_default_summary_path = False
-        else:
-            summary_output_path = os.path.join(os.path.dirname(__file__), f'PBAnalyzerResults_{time}.txt')
+        results_output_path = os.path.join(os.getcwd(), f'SharedReportsWithUnusedData_{time}.csv')
+        summary_output_path = os.path.join(os.getcwd(), f'PBAnalyzerResults_{time}.txt')
+
+        if output_folder:
+            if '.' in os.path.basename(output_folder):
+                print(Fore.RED + 'Invalid output folder path. Using default path.')
+            if not os.path.isdir(output_folder):
+                os.makedirs(output_folder)
+            is_default_result_path = False
+            results_output_path = os.path.join(output_folder, f'SharedReportsWithUnusedData_{time}.csv')
+            summary_output_path = os.path.join(output_folder, f'PBAnalyzerResults_{time}.txt')
 
         super().__init__('Reports shared to whole organization analyzer', results_output_path, is_default_result_path,
-                         summary_output_path, is_default_summary_path, debug)
+                         summary_output_path, debug)
 
     @staticmethod
     def _extract_artifact_ids(response: dict):
@@ -183,14 +179,12 @@ class SharedReportsAnalyzer(BaseAnalyzer):
 
 def main():
     parser = argparse.ArgumentParser(description='Analyze Shared Power BI Reports')
-    parser.add_argument('--results_output_path', type=str, help='Path to the output CSV file', default=None)
-    parser.add_argument('--summary_output_path', type=str, help='Path to the summary TXT file', default=None)
+    parser.add_argument('--output-folder', type=str, help='The path to the output folder')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
     args = parser.parse_args()
 
     analyzer = SharedReportsAnalyzer(
-        results_output_path=args.results_output_path,
-        summary_output_path=args.summary_output_path,
+        output_folder=args.output_folder,
         debug=args.debug
     )
     analyzer.analyze()
