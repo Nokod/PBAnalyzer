@@ -18,17 +18,22 @@ from pb_analyzer.utils import count_hidden_true_in_dict, get_classified_columns,
 
 
 class PublicReportsAnalyzer(BaseAnalyzer):
-    def __init__(self, embed_codes_path: str, output_folder: str = None, debug: bool = False):
+    def __init__(self, embed_codes_file_path: str, output_folder: str = None, debug: bool = False):
         """
         Args:
-            embed_codes_path:  The full path to the Power BI Reports CSV file.
+            embed_codes_file_path:  The full path to the Power BI Reports CSV file.
             output_folder: The path to the output folder.
 
         Example usage:
         PublicReportAnalyzer('C:/Users/username/Downloads/PowerBIReports.csv', 'C:/Users/username/Downloads/Output.csv').analyze()
         """
         time = int(round(datetime.now().timestamp()))
-        self._csv_file_path = embed_codes_path
+        try:
+            self._validate_embed_codes_file(embed_codes_file_path)
+        except (FileNotFoundError, ValueError) as e:
+            print(Fore.RED + str(e))
+            exit(1)
+        self._embed_codes_file_path = embed_codes_file_path
         is_default_results_path = True
 
         results_output_path = os.path.join(os.getcwd(), f'PublicReportsWithUnusedData_{time}.csv')
@@ -45,6 +50,24 @@ class PublicReportsAnalyzer(BaseAnalyzer):
 
         super().__init__('Analyze Public Reports', results_output_path,
                          is_default_results_path, summary_output_path, debug)
+
+    @staticmethod
+    def _validate_embed_codes_file(embed_codes_path: str):
+        if not os.path.isfile(embed_codes_path):
+            raise FileNotFoundError(f'File not found: {embed_codes_path}')
+
+        if not embed_codes_path.lower().endswith('.csv'):
+            raise ValueError(f'File must be a CSV: {embed_codes_path}')
+
+        expected_headers = ['Report name', 'Workspace name', 'Published by', 'Status', 'Embed URL']
+
+        with open(embed_codes_path, mode='r', encoding='utf-8-sig') as file:
+            reader = csv.reader(file)
+            headers = next(reader, None)
+
+            if headers != expected_headers:
+                raise ValueError(
+                    f'CSV file does not have the expected headers. Are you sure this is an Embed Codes CSV file?')
 
     @staticmethod
     def _send_power_bi_request(url: str) -> Optional[str]:
@@ -119,7 +142,7 @@ class PublicReportsAnalyzer(BaseAnalyzer):
     def _intro(self):
         self._handle_input()
         rows = []
-        with open(self._csv_file_path, mode='r', encoding='utf-8') as file:
+        with open(self._embed_codes_file_path, mode='r', encoding='utf-8') as file:
             reader = csv.reader(file)
             headers = next(reader)
             [rows.append(row) for row in reader]
@@ -164,7 +187,7 @@ def main():
     args = parser.parse_args()
 
     analyzer = PublicReportsAnalyzer(
-        embed_codes_path=args.embed_codes_path,
+        embed_codes_file_path=args.embed_codes_path,
         output_folder=args.output_folder,
         debug=args.debug
     )

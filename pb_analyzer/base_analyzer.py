@@ -62,9 +62,8 @@ class BaseAnalyzer:
         if not self._is_default_results_path:
             return
 
-        print(Fore.YELLOW + f'Default output CSV file: {self._result_output_path}')
-        print(Fore.YELLOW + f'Default output TXT file: {self._summary_output_path}')
-        print(Fore.YELLOW + f'Press Enter to continue with the default paths or type a different directory.')
+        print(Fore.YELLOW + f'Default output directory: {os.path.dirname(self._result_output_path)}')
+        print(Fore.YELLOW + f'Press Enter to continue with the default directory or type a new directory.')
         user_input = input()
         if user_input:
             if '.' in user_input.split('/')[-1]:
@@ -74,8 +73,8 @@ class BaseAnalyzer:
                 os.makedirs(user_input, exist_ok=True)
                 self._result_output_path = os.path.join(user_input, os.path.basename(self._result_output_path))
                 self._summary_output_path = os.path.join(user_input, os.path.basename(self._summary_output_path))
-        print(Fore.GREEN + f'Output CSV file: {self._result_output_path}')
-        print(Fore.GREEN + f'Output TXT file: {self._summary_output_path}')
+        print(Fore.GREEN + f'Output directory: {os.path.dirname(self._result_output_path)}')
+        print()
 
     @abstractmethod
     def _process_report(self, row, bar, start_time, *args):
@@ -160,16 +159,28 @@ class BaseAnalyzer:
             'Reports with unused columns: ' + str(self._reports_with_unused_columns),
             'Reports with hidden columns: ' + str(self._reports_with_hidden_columns),
             'Scan time: ' + str(end_time - start_time),
+            ''
         ]
 
         for line in results:
             print(Fore.WHITE + line)
 
+        error_messages = []
+        if self._success_count != len(rows):
+            if self._tool == 'Analyze Public Reports':
+                error_messages = [
+                    '',
+                    f'Failed to analyze {len(rows) - self._success_count} reports. This failure may be due to several reasons, such as: ',
+                    'Invalid embed code, use of RLS features, etc.'
+                ]
+
         title = ['', 'Project: Power BI Analyzer', f'Tool: {self._tool}', '']
         header = ['=' * 65, 'Results'.center(65), '=' * 65, '']
-        footer = ['=' * 65, '', 'Full analysis saved to ' + self._result_output_path]
-        write_to_txt(self._summary_output_path, title + header + results + footer)
+        closing = ['=' * 65]
+        footer = ['', 'Full analysis saved to ' + self._result_output_path]
+        write_to_txt(self._summary_output_path, title + header + results + closing + error_messages + footer)
         print(Fore.CYAN + "=" * 65)
+        [print(Fore.RED + line) for line in error_messages]
         print()
         print(Fore.GREEN + 'Full analysis saved to ' + self._result_output_path)
         print(Fore.GREEN + 'Results saved to ' + self._summary_output_path)
