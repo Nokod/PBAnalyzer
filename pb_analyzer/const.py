@@ -40,3 +40,7 @@ class ResponseKeys:
     ENTITY_KEY = 'entityKey'
     RELATED_ENTITY_KEY = 'relatedEntityKeys'
     TYPE = 'type'
+
+
+class ExplorationRequestError(Exception):
+    pass
