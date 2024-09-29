@@ -12,7 +12,7 @@ import requests
 from colorama import Fore
 
 from pb_analyzer.base_analyzer import BaseAnalyzer
-from pb_analyzer.const import PublicRequests, REGEX_BI_REQUEST, NEW_HEADERS, ResponseKeys
+from pb_analyzer.const import PublicRequests, REGEX_BI_REQUEST, NEW_HEADERS, ResponseKeys, ExplorationRequestError
 from pb_analyzer.utils import count_hidden_true_in_dict, get_classified_columns, \
     write_to_csv, fetch_columns_and_tables
 
@@ -86,7 +86,8 @@ class PublicReportsAnalyzer(BaseAnalyzer):
         if response.status_code == 200:
             return response.json()
         else:
-            response.raise_for_status()
+            raise ExplorationRequestError(f'Failed to get exploration data. Status code: {response.status_code}',
+                                          response.json()['error']['code'])
 
     @staticmethod
     def _get_model_id(json_response: Union[str, Dict]) -> Optional[str]:
@@ -131,6 +132,10 @@ class PublicReportsAnalyzer(BaseAnalyzer):
             if report_with_unused:
                 self._reports_with_unused_columns += 1
                 self._results.append(row[:-1] + [num_of_hidden, report_with_unused])
+        except ExplorationRequestError as e:
+            if self._debug:
+                print(Fore.RED + str(e))
+            self._errors.append([row[0], e.args[1]])
         except TimeoutError as e:
             raise e
         except Exception as e:

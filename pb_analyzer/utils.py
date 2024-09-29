@@ -1,5 +1,6 @@
 import csv
 import json
+import re
 from typing import Dict, List, Union
 
 from pb_analyzer.const import ResponseKeys
@@ -140,3 +141,8 @@ def write_to_txt(file_path: str, values: List[str]) -> None:
     """
     with open(file_path, 'w', encoding='utf-8') as file:
         file.write('\n'.join(values))
+
+
+def split_and_format(text):
+    split_text = re.sub(r'(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])', ' ', text)
+    return split_text

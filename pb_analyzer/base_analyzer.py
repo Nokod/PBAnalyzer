@@ -8,7 +8,7 @@ from alive_progress import alive_bar
 from colorama import Fore, init
 
 from pb_analyzer.const import ResponseKeys
-from pb_analyzer.utils import write_to_txt, write_to_csv
+from pb_analyzer.utils import write_to_txt, write_to_csv, split_and_format
 
 
 class BaseAnalyzer:
@@ -25,6 +25,7 @@ class BaseAnalyzer:
         self._reports_with_hidden_columns = 0
         self._reports_with_unused_columns = 0
         self._success_count = 0
+        self._errors = []
 
     def _insert_all_columns(self, all_columns, num_of_hidden):
         if num_of_hidden > 0:
@@ -167,12 +168,9 @@ class BaseAnalyzer:
 
         error_messages = []
         if self._success_count != len(rows):
-            if self._tool == 'Analyze Public Reports':
-                error_messages = [
-                    '',
-                    f'Failed to analyze {len(rows) - self._success_count} reports. This failure may be due to several reasons, such as: ',
-                    'Invalid embed code, use of RLS features, etc.'
-                ]
+            if self._errors:
+                error_messages = [f'Failed to analyze "{row[0]}". Error: "{split_and_format(row[1])}"' for row in
+                                  self._errors]
 
         title = ['', 'Project: Power BI Analyzer', f'Tool: {self._tool}', '']
         header = ['=' * 65, 'Results'.center(65), '=' * 65, '']
@@ -180,6 +178,7 @@ class BaseAnalyzer:
         footer = ['', 'Full analysis saved to ' + self._result_output_path]
         write_to_txt(self._summary_output_path, title + header + results + closing + error_messages + footer)
         print(Fore.CYAN + "=" * 65)
+        print()
         [print(Fore.RED + line) for line in error_messages]
         print()
         print(Fore.GREEN + 'Full analysis saved to ' + self._result_output_path)
