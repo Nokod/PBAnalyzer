@@ -15,7 +15,7 @@ If you need help with this tool, please contact amichai@nokodsecurity.com or uri
 To install the package, run the following command:
 
 ```bash
-python3 -m pip install power-bi-analyzer
+pip install power-bi-analyzer
 ```
 
 ## 1st tool - Analyze reports shared with the entire organization
