@@ -57,7 +57,7 @@ class SharedReportsAnalyzer(BaseAnalyzer):
         Acquires an access token using the Microsoft Authentication Library (MSAL).
         """
         app = msal.PublicClientApplication(Requests.CLIENT_ID, authority=Requests.AUTHORITY)
-        result = app.acquire_token_interactive(scopes=Requests.SCOPE)
+        result = app.acquire_token_interactive(scopes=Requests.SCOPE, prompt='login')
 
         if ResponseKeys.ACCESS_TOKEN in result:
             return result[ResponseKeys.ACCESS_TOKEN]
