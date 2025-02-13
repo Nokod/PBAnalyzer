@@ -209,5 +209,3 @@ def main():
         debug=args.debug
     )
     analyzer.analyze()
-
-main()
