@@ -42,14 +42,23 @@ class SharedReportsAnalyzer(BaseAnalyzer):
         super().__init__('Reports shared to whole organization analyzer', results_output_path, is_default_result_path,
                          summary_output_path, debug)
 
-    @staticmethod
-    def _extract_artifact_ids(response: dict):
-        artifact_ids = [
-            (entity[ResponseKeys.ARTIFACT_ID], entity.get(ResponseKeys.SHARER).get(ResponseKeys.DISPLAY_NAME),
-             entity.get(ResponseKeys.DISPLAY_NAME)
-             ) for entity in
-            response.get(ResponseKeys.ARTIFACT_ACCESS_ENTITIES, [])]
-        return artifact_ids
+    def _extract_artifact_ids(self, response: dict):
+        try:
+            artifact_ids = [
+                (entity[ResponseKeys.ARTIFACT_ID],
+                 entity.get(ResponseKeys.SHARER, {}).get(ResponseKeys.DISPLAY_NAME, {}),
+                 entity.get(ResponseKeys.DISPLAY_NAME, {})
+                 ) for entity in
+                response.get(ResponseKeys.ARTIFACT_ACCESS_ENTITIES, [])]
+            if not artifact_ids:
+                raise Exception('No reports shared to whole organization found.')
+            return artifact_ids
+        except Exception as e:
+            print(Fore.RED + 'Failed to extract artifact IDs.')
+            if self._debug:
+                print(Fore.RED + str(e))
+                print(Fore.RED + 'response:', response)
+            exit(1)
 
     @staticmethod
     def _get_token():
@@ -73,14 +82,17 @@ class SharedReportsAnalyzer(BaseAnalyzer):
             response_data = response.json()
             return response_data
 
-    @staticmethod
-    def _links_shared_to_whole_organization_api(token: str):
+    def _links_shared_to_whole_organization_api(self, token: str):
         headers = {'authorization': f'Bearer {token}'}
         response = requests.get(Requests.SHARED_TO_ORG_URL, headers=headers)
 
         if response.status_code == 200:
             response_data = response.json()
+            if self._debug:
+                print(Fore.GREEN + 'Successfully fetched shared reports.')
             return response_data
+        else:
+            raise Exception(f'Failed to get shared reports. Status code: {response.status_code}', response.json())
 
     @staticmethod
     def _send_push_access_request(token: str, report_id: str, region: str):
@@ -112,16 +124,25 @@ class SharedReportsAnalyzer(BaseAnalyzer):
         else:
             raise Exception(f'Failed to send conceptual schema request. Status code: {response.status_code}')
 
-    @staticmethod
-    def _extract_region(response: dict):
-        url = urlparse(response.get(ResponseKeys.REGION))
-        return url.netloc
+    def _extract_region(self, response: dict):
+        try:
+            url = urlparse(response.get(ResponseKeys.REGION))
+            region = url.netloc
+            if self._debug:
+                print(Fore.GREEN + f'Extracted region: {region}')
+            return region
+        except Exception as e:
+            print(Fore.RED + 'Failed to extract region.')
+            if self._debug:
+                print(Fore.RED + str(e))
+            exit(1)
 
     def _process_report(self, report, bar, start_time, *args):
         region, token = args
         report_id, sharer_name, name = report
         try:
             if datetime.now() - start_time > timedelta(minutes=10):
+                print(Fore.RED + 'Passed the 10 minutes mark. Stopped the analysis.')
                 raise TimeoutError('Passes the 10 minutes mark.')
 
             response_data = self._send_push_access_request(token, report_id, region)
@@ -149,11 +170,11 @@ class SharedReportsAnalyzer(BaseAnalyzer):
         token = self._get_token()
         all_shared_res = self._links_shared_to_whole_organization_api(token)
         reports = self._extract_artifact_ids(all_shared_res)
+        print(Fore.GREEN + f'Found {len(reports)} reports shared to whole organization.')
         region = self._extract_region(all_shared_res)
         write_to_csv(self._result_output_path, [SHARED_TO_ORG_HEADERS], True)
         average_time_per_report = 0.5
         estimated_time = len(reports) * average_time_per_report
-        print(Fore.GREEN + f'Found {len(reports)} reports shared to whole organization.')
         print(Fore.YELLOW + f'Estimated time to analyze all reports: {estimated_time} seconds.')
         return region, reports, token
 
