@@ -128,8 +128,13 @@ class SharedReportsAnalyzer(BaseAnalyzer):
             if response.status_code == 200:
                 return response.json()
             elif response.status_code == 429:
-                wait_time = backoff_factor * (2 ** attempt)
-                print(Fore.YELLOW + f'Rate limit exceeded. Retrying in {wait_time} seconds...')
+                message = response.json().get('message')
+                if message and 'Retry in' in message:
+                    wait_time = int(message.split('Retry in ')[1].split(' seconds')[0])
+                    print(Fore.YELLOW + f'Rate limit exceeded. Retrying in {wait_time} seconds...')
+                else:
+                    wait_time = backoff_factor * (2 ** attempt)
+                    print(Fore.YELLOW + f'Rate limit exceeded. Retrying in {wait_time} seconds...')
                 time.sleep(wait_time)
             else:
                 raise Exception(f'Failed to send conceptual schema request. Status code: {response.status_code}')
