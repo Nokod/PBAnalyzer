@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import time
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
@@ -117,12 +118,23 @@ class SharedReportsAnalyzer(BaseAnalyzer):
     def _send_conceptual_schema_request(token: str, model_id: str, region: str):
         headers = {'authorization': f'Bearer {token}', 'content-type': 'application/json; charset=UTF-8'}
         data = {"modelIds": [model_id], "userPreferredLocale": "en-US"}
-        response = requests.post(Requests.CONCEPTUAL_SCHEMA_URL.format(region), headers=headers, data=json.dumps(data))
+        max_retries = 5
+        backoff_factor = 5
 
-        if response.status_code == 200:
-            return response.json()
-        else:
-            raise Exception(f'Failed to send conceptual schema request. Status code: {response.status_code}')
+        for attempt in range(max_retries):
+            response = requests.post(Requests.CONCEPTUAL_SCHEMA_URL.format(region), headers=headers,
+                                     data=json.dumps(data))
+
+            if response.status_code == 200:
+                return response.json()
+            elif response.status_code == 429:
+                wait_time = backoff_factor * (2 ** attempt)
+                print(Fore.YELLOW + f'Rate limit exceeded. Retrying in {wait_time} seconds...')
+                time.sleep(wait_time)
+            else:
+                raise Exception(f'Failed to send conceptual schema request. Status code: {response.status_code}')
+
+        raise Exception('Max retries exceeded for conceptual schema request.')
 
     def _extract_region(self, response: dict):
         try:
@@ -143,7 +155,7 @@ class SharedReportsAnalyzer(BaseAnalyzer):
         try:
             if datetime.now() - start_time > timedelta(minutes=10):
                 print(Fore.RED + 'Passed the 10 minutes mark. Stopped the analysis.')
-                raise TimeoutError('Passes the 10 minutes mark.')
+                raise TimeoutError('Passed the 10 minutes mark.')
 
             response_data = self._send_push_access_request(token, report_id, region)
             if response_data:
