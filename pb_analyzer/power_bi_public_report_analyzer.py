@@ -76,6 +76,7 @@ class PublicReportsAnalyzer(BaseAnalyzer):
             match: Optional[re.Match] = re.search(REGEX_BI_REQUEST, response.text)
             if match:
                 return match.group(1)
+        raise Exception(f'Failed to get region URL. Status code: {response.status_code}')
 
     @staticmethod
     def _send_exploration_request(region_url: str, resource_key: str) -> Optional[Dict]:
@@ -89,8 +90,7 @@ class PublicReportsAnalyzer(BaseAnalyzer):
             raise ExplorationRequestError(f'Failed to get exploration data. Status code: {response.status_code}',
                                           response.json()['error']['code'])
 
-    @staticmethod
-    def _get_model_id(json_response: Union[str, Dict]) -> Optional[str]:
+    def _get_model_id(self, json_response: Union[str, Dict]) -> Optional[str]:
         try:
             data: Dict = json.loads(json_response) if isinstance(json_response, str) else json_response
             models: List[Dict] = data.get(ResponseKeys.MODELS, [{}])
@@ -98,9 +98,12 @@ class PublicReportsAnalyzer(BaseAnalyzer):
                 return models[0].get(ResponseKeys.ID)
         except (json.JSONDecodeError, KeyError, TypeError) as e:
             return None
+        except Exception as e:
+            print(Fore.RED + 'Failed to get model ID.')
+            if self._debug:
+                print(Fore.RED + str(e))
 
-    @staticmethod
-    def _send_conceptual_schema_request(region_url: str, model_id: str, resource_key: str) -> Optional[Dict]:
+    def _send_conceptual_schema_request(self, region_url: str, model_id: str, resource_key: str) -> Optional[Dict]:
         headers: Dict[str, str] = {'X-PowerBI-ResourceKey': resource_key}
         payload: Dict[str, List[str]] = {'modelIds': [model_id]}
         response: requests.Response = requests.post(PublicRequests.CONCEPTUAL_SCHEMA_URL.format(region_url),
@@ -108,7 +111,9 @@ class PublicReportsAnalyzer(BaseAnalyzer):
         if response.status_code == 200:
             return response.json()
         else:
-            response.raise_for_status()
+            print(Fore.RED + f'Failed to get conceptual schema. Status code: {response.status_code}')
+            if self._debug:
+                response.raise_for_status()
 
     @staticmethod
     def _decode_url(encoded_url: str) -> dict:
@@ -139,8 +144,7 @@ class PublicReportsAnalyzer(BaseAnalyzer):
         except TimeoutError as e:
             raise e
         except Exception as e:
-            if self._debug:
-                print(Fore.RED + str(e))
+            print(Fore.RED + str(e))
         bar()
         return
 

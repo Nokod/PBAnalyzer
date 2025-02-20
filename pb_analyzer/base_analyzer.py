@@ -86,7 +86,7 @@ class BaseAnalyzer:
         timed_out = False
 
         with alive_bar(len(rows), bar='blocks') as bar:
-            with concurrent.futures.ThreadPoolExecutor() as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
                 futures = [executor.submit(self._process_report, row, bar, start_time, *args) for row in rows]
                 for future in concurrent.futures.as_completed(futures):
                     try:
