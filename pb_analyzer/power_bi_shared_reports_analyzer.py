@@ -16,15 +16,18 @@ from pb_analyzer.utils import count_hidden_true_in_dict, fetch_columns_and_table
 
 
 class SharedReportsAnalyzer(BaseAnalyzer):
-    def __init__(self, output_folder: str = None, debug: bool = False):
+    def __init__(self, output_folder: str = None, debug: bool = False, extended_time_limit: bool = False):
         """
 
         Args:
             output_folder: The path to the output folder.
+            debug: Enable debug mode.
+            extended_time_limit: If True, extends the time limit from 10 minutes to 60 minutes.
 
         Example usage:
         SharedToWholeOrganizationAnalyzer('C:/Users/username/Downloads/Output.csv', 'C:/Users/username/Downloads/Results.txt').analyze()
         """
+        self._time_limit_minutes = 60 if extended_time_limit else 10
         time = int(round(datetime.now().timestamp()))
         is_default_result_path = True
 
@@ -158,9 +161,9 @@ class SharedReportsAnalyzer(BaseAnalyzer):
         region, token = args
         report_id, sharer_name, name = report
         try:
-            if datetime.now() - start_time > timedelta(minutes=10):
-                print(Fore.RED + 'Passed the 10 minutes mark. Stopped the analysis.')
-                raise TimeoutError('Passed the 10 minutes mark.')
+            if datetime.now() - start_time > timedelta(minutes=self._time_limit_minutes):
+                print(Fore.RED + f'Passed the {self._time_limit_minutes} minutes mark. Stopped the analysis.')
+                raise TimeoutError(f'Passed the {self._time_limit_minutes} minutes mark.')
 
             response_data = self._send_push_access_request(token, report_id, region)
             if response_data:
@@ -219,10 +222,12 @@ def main():
     parser = argparse.ArgumentParser(description='Analyze Shared Power BI Reports')
     parser.add_argument('--output-folder', type=str, help='The path to the output folder')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
+    parser.add_argument('--extended-time', action='store_true', help='Extend time limit from 10 to 60 minutes')
     args = parser.parse_args()
 
     analyzer = SharedReportsAnalyzer(
         output_folder=args.output_folder,
-        debug=args.debug
+        debug=args.debug,
+        extended_time_limit=args.extended_time
     )
     analyzer.analyze()
