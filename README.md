@@ -32,8 +32,10 @@ You may provide the name of the output CSV file and the summary file as argument
 Example usage:
 
 ```bash
-shared-reports-analyzer --output-folder "path/to/output folder"
+shared-reports-analyzer --output-folder "path/to/output folder" --extended-time
 ```
+
+The `--extended-time` flag extends the analysis time limit from 10 minutes to 60 minutes. This is useful when you need to analyze a large number of reports shared with the entire organization.
 
 ### Output
 CSV file containing the following columns:

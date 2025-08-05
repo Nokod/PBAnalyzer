@@ -99,7 +99,7 @@ class BaseAnalyzer:
                         break
             write_to_csv(self._result_output_path, self._results)
         if timed_out:
-            print(Fore.RED + 'Passed the 10 minutes mark. Stopped the analysis.')
+            print(Fore.RED + 'Time limit exceeded. Stopped the analysis.')
             sleep(1)
         end_time = datetime.now()
         return end_time, rows, start_time

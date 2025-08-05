@@ -5,7 +5,7 @@ with open('requirements.txt') as f:
 
 setup(
     name='power_bi_analyzer',
-    version='1.0.4',
+    version='1.1.0',
     packages=find_packages(),
     entry_points={
         'console_scripts': [
